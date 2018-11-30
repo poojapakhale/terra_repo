@@ -1,0 +1,188 @@
+# Configure the AWS Provider
+provider "aws" {
+  region = "us-east-2"
+}
+
+#######################################################################
+#VPC creation
+#####################################################################
+resource "aws_vpc" "se_pe_Cel-prod" {
+  cidr_block       = "10.50.0.0/16"
+  instance_tenancy = "default"
+ enable_dns_hostnames = "1"
+
+  tags {
+    Name = "se_pe_Cel-prod"
+  }
+}
+
+#######################################################################
+#subnets creation
+#####################################################################
+resource "aws_subnet" "se_pe_Cel_public_2a" {
+  vpc_id     = "${aws_vpc.se_pe_Cel-prod.id}"
+  cidr_block = "10.50.0.0/20"
+ availability_zone = "us-east-2a"
+
+  tags {
+    Name = "se_pe_Cel_public_2a"
+  }
+}
+
+
+
+resource "aws_subnet" "se_pe_Cel_private_2a" {
+  vpc_id     = "${aws_vpc.se_pe_Cel-prod.id}"
+  cidr_block = "10.50.16.0/20"
+ availability_zone = "us-east-2a"
+
+  tags {
+    Name = "se_pe_Cel_private_2a"
+  }
+}
+
+
+
+resource "aws_subnet" "se_pe_Cel_private_2b" {
+  vpc_id     = "${aws_vpc.se_pe_Cel-prod.id}"
+  cidr_block = "10.50.32.0/20"
+ availability_zone = "us-east-2b"
+
+  tags {
+    Name = "se_pe_Cel_private_2b"
+  }
+}
+
+resource "aws_subnet" "se_pe_Cel_public_2b" {
+  vpc_id     = "${aws_vpc.se_pe_Cel-prod.id}"
+  cidr_block = "10.50.48.0/20"
+ availability_zone = "us-east-2b"
+
+  tags {
+    Name = "se_pe_Cel_public_2b"
+  }
+}
+
+
+#internet gateway
+resource "aws_internet_gateway" "se_pe_Cel-prod-igateway" {
+  vpc_id = "${aws_vpc.se_pe_Cel-prod.id}"
+
+  tags {
+    Name = "se_pe_Cel-prod-igateway"
+  }
+}
+
+# route table
+resource "aws_route_table" "se_pe_Cel-prod-public" {
+  vpc_id = "${aws_vpc.se_pe_Cel-prod.id}"
+
+  route {
+    cidr_block = "0.0.0.0/0"
+    gateway_id = "${aws_internet_gateway.se_pe_Cel-prod-igateway.id}"
+  }
+
+  tags {
+    Name = "se_pe_Cel-prod-public"
+  }
+}
+
+#######################################################################
+#security group for bastion server [ssh from anywhere]
+#####################################################################
+resource "aws_security_group" "Bastion_sg" {
+  name = "Bastion_sg"
+ vpc_id      = "${aws_vpc.se_pe_Cel-prod.id}"
+
+
+  ingress {
+    from_port   = 22
+    to_port     = 22
+    protocol    = "tcp"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
+
+egress {
+  from_port   = 0
+  to_port     = 0
+  protocol    = "-1"
+  cidr_blocks = ["0.0.0.0/0"]
+}
+
+tags {
+    Name = "Bastion_sg"
+  }
+}
+
+
+#######################################################################
+#security group for Cel(private) server [all traffic from itself]
+#####################################################################
+resource "aws_security_group" "Cel_server_sg" {
+  name = "Cel_server_sg"
+vpc_id      = "${aws_vpc.se_pe_Cel-prod.id}"
+
+
+ingress {
+    protocol  = -1
+    self      = true
+    from_port = 0
+    to_port   = 0
+  }
+
+egress {
+  from_port   = 0
+  to_port     = 0
+  protocol    = "-1"
+  cidr_blocks = ["0.0.0.0/0"]
+}
+
+tags {
+    Name = "Cel_server_sg"
+  }
+}
+
+#######################################################################
+#security group for ALB server [http from anywhere]
+#####################################################################
+resource "aws_security_group" "ALB_sg" {
+  name = "ALB_sg"
+ vpc_id      = "${aws_vpc.se_pe_Cel-prod.id}"
+
+
+  ingress {
+    from_port   = 80
+    to_port     = 80
+    protocol    = "tcp"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
+
+egress {
+  from_port   = 0
+  to_port     = 0
+  protocol    = "-1"
+  cidr_blocks = ["0.0.0.0/0"]
+}
+
+tags {
+    Name = "ALB_sg"
+  }
+}
+
+
+#######################################################################
+#Bastion server
+#####################################################################
+
+resource "aws_instance" "example" {
+  ami           = "ami-0b500ef59d8335eee"
+  instance_type = "t2.micro"
+ #vpc_id = "${aws_vpc.se_pe_Cel-prod.id}" {not working}
+vpc_security_group_ids = [ "${aws_security_group.Bastion_sg.id}"]
+subnet_id = "${aws_subnet.se_pe_Cel_public_2a.id}"
+
+ tags {
+    Name = "Bastion_server"
+  }
+
+}
