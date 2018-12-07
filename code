@@ -183,6 +183,8 @@ subnet_id = "${aws_subnet.se_pe_Cel_public_2a.id}"
 
  tags {
     Name = "Bastion_server"
-  }
+}  
 
 }
+
+#insert for commit
